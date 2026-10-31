@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "name": "UltraSource",
+  "identifier": "com.glitchfling.ultrasource",
+  "subtitle": "The UltraStore app catalog",
+  "description": "An independently maintained app catalog for UltraStore. Not affiliated with the official SideStore project.",
+  "website": "https://github.com/glitchFling/SSUM",
+  "sourceURL": "https://raw.githubusercontent.com/glitchFling/SSUM/develop/UltraSource/source.json",
+  "iconURL": "https://raw.githubusercontent.com/glitchFling/SSUM/develop/UltraSource/icon.png",
+  "tintColor": "#4945F5",
+  "apps": [],
+  "news": []
+}
