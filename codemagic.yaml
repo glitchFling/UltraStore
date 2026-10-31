@@ -1,0 +1,86 @@
+# Start builds manually to conserve the personal account's free macOS minutes.
+# For an interactive desktop, enable "SSH/VNC access" in Start new build.
+# Remote access is a Codemagic UI option, not a YAML setting.
+workflows:
+  ultrastore-simulator:
+    name: UltraStore - Simulator and Xcode debugging
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: "27.2"
+    scripts:
+      - &prepare
+        name: Initialize dependencies and check Xcode
+        script: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git submodule update --init --recursive
+          mkdir -p build/codemagic-logs
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: Resolve Swift packages
+        script: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project AltStore.xcodeproj \
+            -scheme SideStore \
+            -clonedSourcePackagesDirPath "$CM_BUILD_DIR/build/SourcePackages" \
+            2>&1 | tee build/codemagic-logs/resolve-simulator.log
+      - name: Build for iOS Simulator
+        script: |
+          set -euo pipefail
+          xcodebuild build \
+            -project AltStore.xcodeproj \
+            -scheme SideStore \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$CM_BUILD_DIR/build/codemagic-simulator" \
+            -clonedSourcePackagesDirPath "$CM_BUILD_DIR/build/SourcePackages" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM=XYZ0123456 \
+            ORG_IDENTIFIER=com.SideStore \
+            2>&1 | tee build/codemagic-logs/simulator.log
+      - name: Package Simulator app and open Xcode
+        script: |
+          set -euo pipefail
+          APP_PATH="$CM_BUILD_DIR/build/codemagic-simulator/Build/Products/Debug-iphonesimulator/SideStore.app"
+          test -d "$APP_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" build/UltraStore-simulator.zip
+          open "$CM_BUILD_DIR/AltStore.xcodeproj"
+          open -a Simulator
+          xcrun simctl list devices available
+          echo "Connect using the build page's Explore build machine via SSH or VNC option."
+          echo "In Xcode, select SideStore and an iPhone Simulator to run and debug."
+          echo "Simulator app: $APP_PATH"
+          echo "Physical-device pairing, VPN, and signing still require iPhone testing."
+    artifacts:
+      - build/UltraStore-simulator.zip
+      - build/codemagic-logs/*.log
+
+  ultrastore-ipa:
+    name: UltraStore - IPA for development re-signing
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: "27.2"
+      vars:
+        BUILD_CONFIG: Release
+    scripts:
+      - *prepare
+      - name: Install entitlement signing tool
+        script: |
+          set -euo pipefail
+          if ! command -v ldid >/dev/null 2>&1; then
+            brew install ldid
+          fi
+      - name: Build and package IPA
+        script: |
+          set -euo pipefail
+          make build fakesign ipa 2>&1 | tee build/codemagic-logs/ipa.log
+          test -s SideStore.ipa
+          echo "SideStore.ipa is not development-signed. Re-sign with iLoader before installing."
+    artifacts:
+      - SideStore.ipa
+      - build/codemagic-logs/*.log
