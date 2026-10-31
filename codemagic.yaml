@@ -50,10 +50,23 @@ workflows:
           APP_PATH="$CM_BUILD_DIR/build/codemagic-simulator/Build/Products/Debug-iphonesimulator/SideStore.app"
           test -d "$APP_PATH"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" build/UltraStore-simulator.zip
-          open "$CM_BUILD_DIR/AltStore.xcodeproj"
-          SIMULATOR_APP="$(xcode-select -p)/Applications/Simulator.app"
-          test -d "$SIMULATOR_APP"
-          open "$SIMULATOR_APP"
+          # GUI setup is optional: retain the build artifact even without a desktop session.
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR:-<unset>}"
+          echo "xcode-select: $(xcode-select -p)"
+          SIMCTL_PATH="$(xcrun --find simctl)"
+          echo "simctl: $SIMCTL_PATH"
+          SIMULATOR_APP="${SIMCTL_PATH%/usr/bin/simctl}/Applications/Simulator.app"
+          if ! open "$CM_BUILD_DIR/AltStore.xcodeproj"; then
+            echo "Warning: Xcode could not open automatically. Open the project from VNC."
+          fi
+          if [ -d "$SIMULATOR_APP" ]; then
+            if ! open "$SIMULATOR_APP"; then
+              echo "Warning: Simulator could not open automatically. Open it from Xcode > Open Developer Tool."
+            fi
+          else
+            echo "Warning: Simulator.app not found at $SIMULATOR_APP."
+            echo "From VNC, use Xcode > Open Developer Tool > Simulator."
+          fi
           xcrun simctl list devices available
           echo "Connect using the build page's Explore build machine via SSH or VNC option."
           echo "In Xcode, select SideStore and an iPhone Simulator to run and debug."
