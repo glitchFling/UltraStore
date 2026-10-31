@@ -51,7 +51,9 @@ workflows:
           test -d "$APP_PATH"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" build/UltraStore-simulator.zip
           open "$CM_BUILD_DIR/AltStore.xcodeproj"
-          open -a Simulator
+          SIMULATOR_APP="$(xcode-select -p)/Applications/Simulator.app"
+          test -d "$SIMULATOR_APP"
+          open "$SIMULATOR_APP"
           xcrun simctl list devices available
           echo "Connect using the build page's Explore build machine via SSH or VNC option."
           echo "In Xcode, select SideStore and an iPhone Simulator to run and debug."
