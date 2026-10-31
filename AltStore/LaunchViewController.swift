@@ -19,7 +19,6 @@ final class LaunchViewController: UIViewController {
     private var maxRetries = 3
     private var splashViewModel = SplashViewModel()
     private var destinationViewController: TabBarController?
-    private var startTime: Date!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -38,7 +37,11 @@ final class LaunchViewController: UIViewController {
             }
         #endif
 
-        let splashHosting = UIHostingController(rootView: SplashView(viewModel: splashViewModel))
+        view.backgroundColor = .black
+        let splashHosting = UIHostingController(rootView: SplashView(viewModel: splashViewModel) { [weak self] in
+            self?.transitionToMainInterface()
+        })
+        splashHosting.view.backgroundColor = .black
         embed(child: splashHosting)
     }
 
@@ -62,7 +65,6 @@ final class LaunchViewController: UIViewController {
         debugLog("LaunchViewController.viewDidAppear() invoked")
         super.viewDidAppear(animated)
         guard !didFinishLaunching else { return }
-        startTime = Date()
         splashViewModel.updateStatus(NSLocalizedString("Starting…", comment: ""))
         
         // spin off the startup sequence concurrently
@@ -192,11 +194,7 @@ final class LaunchViewController: UIViewController {
         updateKnownSources()
         splashViewModel.updateStatus(NSLocalizedString("Almost there…", comment: ""))
 
-        let elapsed = abs(startTime.timeIntervalSinceNow)
-        let remaining = elapsed >= 1 ? 0 : 1 - elapsed
-        try? await Task.sleep(nanoseconds: UInt64(remaining * 500_000_000))
-
-        transitionToMainInterface()
+        splashViewModel.isReadyToExit = true
     }
 
     @MainActor
@@ -208,7 +206,7 @@ final class LaunchViewController: UIViewController {
         // Set initial alpha for fade-in
         destinationVC.view.alpha = 0
 
-        UIView.transition(with: view, duration: 0.3, options: .transitionCrossDissolve) { [self] in
+        UIView.animate(withDuration: UIAccessibility.isReduceMotionEnabled ? 0.2 : 0.5, delay: 0, options: [.beginFromCurrentState, .curveEaseInOut]) { [self] in
             for child in self.children where child !== destinationVC {
                 child.view.alpha = 0
             }
