@@ -86,6 +86,21 @@ struct InstallIPAIntent: AppIntent, ProgressReportingIntent
 
 
 @available(iOS 17.0, tvOS 17.0, *)
+enum RefreshErrorBehavior: String, AppEnum
+{
+    case fail
+    case printOnly
+    case skip
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Fail on Error"
+    static var caseDisplayRepresentations: [RefreshErrorBehavior: DisplayRepresentation] = [
+        .fail: "Fail",
+        .printOnly: "print-only",
+        .skip: "skip"
+    ]
+}
+
+@available(iOS 17.0, tvOS 17.0, *)
 extension RefreshAllAppsIntent
 {
     private actor OperationActor
@@ -107,8 +122,13 @@ struct RefreshAllAppsIntent: AppIntent, CustomIntentMigratedAppIntent, Predictab
     static var title: LocalizedStringResource = "Refresh All Apps"
     static var description = IntentDescription("Refreshes your sideloaded apps to prevent them from expiring.")
     
+    @Parameter(title: "Fail on Error", default: .fail)
+    var errorBehavior: RefreshErrorBehavior
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Refresh All Apps")
+        Summary("Refresh All Apps") {
+            \.$errorBehavior
+        }
     }
     
     static var predictionConfiguration: some IntentPredictionConfiguration {
@@ -148,12 +168,12 @@ struct RefreshAllAppsIntent: AppIntent, CustomIntentMigratedAppIntent, Predictab
                 taskGroup.addTask {
                     try await self.refreshAllApps()
                 }
-                
+
                 taskGroup.addTask {
                     try await Task.sleep(until: deadline)
                     throw OperationError.timedOut
                 }
-                
+
                 do
                 {
                     for try await _ in taskGroup.prefix(1)
@@ -169,7 +189,7 @@ struct RefreshAllAppsIntent: AppIntent, CustomIntentMigratedAppIntent, Predictab
                     // so we'll now present a normal notification when finished.
                     let operation = await self.operationActor.operation
                     operation?.presentsFinishedNotification = true
-                    
+
                     try await self.requestToContinueInForeground()
                 }
             }
@@ -178,11 +198,17 @@ struct RefreshAllAppsIntent: AppIntent, CustomIntentMigratedAppIntent, Predictab
         }
         catch
         {
-            // Print-only: log the failure instead of throwing, so a refresh
-            // error doesn't fail the intent and stop the rest of the Shortcuts
-            // script. Needs proper testing.
-            debugLog("[RefreshAllAppsIntent] Refresh All Apps failed: \(error)")
-            return .result(dialog: "All apps have been refreshed.")
+            // Expanded Shortcuts options need proper testing on-device.
+            switch self.errorBehavior
+            {
+            case .fail:
+                throw IntentError(error)
+            case .printOnly:
+                debugLog("[RefreshAllAppsIntent] Refresh All Apps failed: \(error)")
+                return .result(dialog: "Refresh failed: \(error.localizedDescription)")
+            case .skip:
+                return .result(dialog: "")
+            }
         }
     }
 }
@@ -198,40 +224,42 @@ private extension RefreshAllAppsIntent
         let installedApps = await context.perform { InstalledApp.fetchAppsForRefreshingAll(in: context) }
         
         try await withCheckedThrowingContinuation { continuation in
-            let operation = try? AppManager.shared.backgroundRefresh(installedApps, presentsNotifications: self.presentsNotifications) { (result) in
-                do
-                {
-                    let results = try result.get()
-                    
-                    for (_, result) in results
+            do
+            {
+                let operation = try AppManager.shared.backgroundRefresh(installedApps, presentsNotifications: self.presentsNotifications) { (result) in
+                    do
                     {
-                        guard case let .failure(error) = result else { continue }
-                        throw error
+                        let results = try result.get()
+
+                        for (_, result) in results
+                        {
+                            guard case let .failure(error) = result else { continue }
+                            throw error
+                        }
+
+                        continuation.resume()
                     }
-                    
-                    continuation.resume()
+                    catch OperationError.noInstalledApps
+                    {
+                        continuation.resume()
+                    }
+                    catch
+                    {
+                        continuation.resume(throwing: error)
+                    }
                 }
-                catch OperationError.noInstalledApps
-                {
-                    continuation.resume()
-                }
-                catch
-                {
-                    continuation.resume(throwing: error)
+
+                operation.ignoresServerNotFoundError = false
+
+                self.progress.addChild(operation.progress, withPendingUnitCount: 1)
+
+                Task {
+                    await self.operationActor.set(operation)
                 }
             }
-            
-            guard let operation else {
-                debugLog("[RefreshAllAppsIntent] backgroundRefresh instance is nil")
-                return 
-            }
-            
-            operation.ignoresServerNotFoundError = false
-            
-            self.progress.addChild(operation.progress, withPendingUnitCount: 1)
-            
-            Task {
-                await self.operationActor.set(operation)
+            catch
+            {
+                continuation.resume(throwing: error)
             }
         }
     }
@@ -307,8 +335,13 @@ struct RefreshAppIntent: AppIntent, PredictableIntent, ProgressReportingIntent, 
     @Parameter(title: "App")
     var app: InstalledAppEntity?
     
+    @Parameter(title: "Fail on Error", default: .fail)
+    var errorBehavior: RefreshErrorBehavior
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Refresh \(\.$app)")
+        Summary("Refresh \(\.$app)") {
+            \.$errorBehavior
+        }
     }
     
     static var predictionConfiguration: some IntentPredictionConfiguration {
@@ -335,12 +368,12 @@ struct RefreshAppIntent: AppIntent, PredictableIntent, ProgressReportingIntent, 
                 taskGroup.addTask {
                     try await self.refreshApp()
                 }
-                
+
                 taskGroup.addTask {
                     try await Task.sleep(until: deadline)
                     throw OperationError.timedOut
                 }
-                
+
                 do
                 {
                     for try await _ in taskGroup.prefix(1)
@@ -356,7 +389,7 @@ struct RefreshAppIntent: AppIntent, PredictableIntent, ProgressReportingIntent, 
                     // so we'll now present a normal notification when finished.
                     let operation = await self.operationActor.operation
                     operation?.presentsFinishedNotification = true
-                    
+
                     try await self.requestToContinueInForeground()
                 }
             }
@@ -365,9 +398,16 @@ struct RefreshAppIntent: AppIntent, PredictableIntent, ProgressReportingIntent, 
         }
         catch
         {
-            // Print-only: log the failure instead of failing the Shortcuts run.
-            debugLog("[RefreshAppIntent] Refresh App failed: \(error)")
-            return .result(dialog: "Refreshed \(self.app?.name ?? "app").")
+            switch self.errorBehavior
+            {
+            case .fail:
+                throw IntentError(error)
+            case .printOnly:
+                debugLog("[RefreshAppIntent] Refresh App failed: \(error)")
+                return .result(dialog: "Refresh failed: \(error.localizedDescription)")
+            case .skip:
+                return .result(dialog: "")
+            }
         }
     }
 }
@@ -378,8 +418,7 @@ private extension RefreshAppIntent
     func refreshApp() async throws
     {
         guard let app = self.app else {
-            debugLog("[RefreshAppIntent] no app selected")
-            return
+            throw OperationError.invalidParameters("No app selected.")
         }
         
         try await DatabaseManager.shared.start()
@@ -388,47 +427,46 @@ private extension RefreshAppIntent
         let installedApps = await context.perform { InstalledApp.fetchAppsForRefreshingAll(in: context) }
         
         guard let installedApp = installedApps.first(where: { $0.bundleIdentifier == app.id }) else {
-            debugLog("[RefreshAppIntent] app '\(app.name)' (\(app.id)) not found or not refreshable")
-            return
+            throw OperationError.invalidParameters("The selected app is not installed or cannot be refreshed.")
         }
         
         try await withCheckedThrowingContinuation { continuation in
-            let operation = try? AppManager.shared.backgroundRefresh([installedApp], presentsNotifications: true) { (result) in
-                do
-                {
-                    let results = try result.get()
-                    
-                    for (_, result) in results
+            do
+            {
+                let operation = try AppManager.shared.backgroundRefresh([installedApp], presentsNotifications: true) { (result) in
+                    do
                     {
-                        guard case let .failure(error) = result else { continue }
-                        debugLog("[RefreshAppIntent] failed to refresh app: \(error)")
+                        let results = try result.get()
+
+                        for (_, result) in results
+                        {
+                            guard case let .failure(error) = result else { continue }
+                            throw error
+                        }
+
+                        continuation.resume()
                     }
-                    
-                    continuation.resume()
+                    catch OperationError.noInstalledApps
+                    {
+                        continuation.resume()
+                    }
+                    catch
+                    {
+                        continuation.resume(throwing: error)
+                    }
                 }
-                catch OperationError.noInstalledApps
-                {
-                    continuation.resume()
-                }
-                catch
-                {
-                    debugLog("[RefreshAppIntent] backgroundRefresh failed: \(error)")
-                    continuation.resume()
+
+                operation.ignoresServerNotFoundError = false
+
+                self.progress.addChild(operation.progress, withPendingUnitCount: 1)
+
+                Task {
+                    await self.operationActor.set(operation)
                 }
             }
-            
-            guard let operation else {
-                debugLog("[RefreshAppIntent] backgroundRefresh instance is nil")
-                continuation.resume()
-                return
-            }
-            
-            operation.ignoresServerNotFoundError = false
-            
-            self.progress.addChild(operation.progress, withPendingUnitCount: 1)
-            
-            Task {
-                await self.operationActor.set(operation)
+            catch
+            {
+                continuation.resume(throwing: error)
             }
         }
     }
