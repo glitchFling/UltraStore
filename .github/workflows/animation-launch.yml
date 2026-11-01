@@ -1,0 +1,42 @@
+name: Export launch animation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [open-animation-launch, animation_launch]
+    paths:
+      - SideStore/Views/SplashView.swift
+      - scripts/animation/**
+      - .github/workflows/animation-launch.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: animation-launch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    name: Record SwiftUI splash as MP4
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1.6.0
+        with:
+          xcode-version: "27.2"
+      - name: Build preview and record video
+        run: bash scripts/animation/export-launch.sh
+      - name: Upload video and recording diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: animation_launch
+          path: |
+            build/animation_launch/animation_launch.mp4
+            build/animation_launch/final-frame.png
+            build/animation_launch/recording.log
+          if-no-files-found: warn
+          retention-days: 14
