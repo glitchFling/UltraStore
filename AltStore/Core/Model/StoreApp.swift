@@ -693,10 +693,10 @@ public extension StoreApp
         let placeholderChannel = ReleaseTrackType.stable.description
         
         let app = StoreApp(context: context)
-        app.name = "SideStore"
+        app.name = "UltraStore"
         app.bundleIdentifier = placeholderBundleId
         app.developerName = "Side Team"
-        app.localizedDescription = "SideStore is an alternative App Store."
+        app.localizedDescription = "UltraStore is an independent fork of SideStore."
         app.iconURL = sideStoreAppIconURL        
         app.screenshotURLs = []
         app.sourceIdentifier = placeholderSourceID

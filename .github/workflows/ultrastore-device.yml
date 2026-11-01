@@ -1,0 +1,78 @@
+name: Build UltraStore IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [open-animation-launch]
+    paths:
+      - Build.xcconfig
+      - AltStore/**
+      - AltWidget/**
+      - SideStore/**
+      - Shared/**
+      - .github/workflows/ultrastore-device.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ultrastore-device-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: UltraStore 0.0.2 - iPhone IPA
+    runs-on: xcode-27
+    timeout-minutes: 90
+    env:
+      BUILD_CONFIG: Release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: maxim-lobanov/setup-xcode@v1.6.0
+        with:
+          xcode-version: "27.2"
+      - name: Install packaging tool
+        run: brew install ldid
+      - name: Build and package for iPhone
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/logs
+          make build fakesign ipa 2>&1 | tee build/logs/ultrastore-device.log
+      - name: Verify app identity and name the artifact
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          import shutil
+          import zipfile
+          with zipfile.ZipFile("SideStore.ipa") as ipa:
+              info = plistlib.loads(ipa.read("Payload/SideStore.app/Info.plist"))
+          expected = {
+              "CFBundleDisplayName": "UltraStore",
+              "CFBundleName": "UltraStore",
+              "CFBundleIdentifier": "com.ultrastore.xp",
+              "CFBundleShortVersionString": "0.0.2",
+              "CFBundleVersion": "2",
+          }
+          for key, value in expected.items():
+              assert info.get(key) == value, f"{key}: expected {value!r}, got {info.get(key)!r}"
+          print("Verified UltraStore / com.ultrastore.xp / 0.0.2 (2)")
+          shutil.copyfile("SideStore.ipa", "build/UltraStore-0.0.2.ipa")
+          PY
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltraStore-0.0.2
+          path: build/UltraStore-0.0.2.ipa
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltraStore-device-build-log
+          path: build/logs/ultrastore-device.log
+          if-no-files-found: warn
+          retention-days: 7

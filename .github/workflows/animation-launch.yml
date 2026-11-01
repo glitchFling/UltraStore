@@ -2,12 +2,6 @@ name: Export launch animation
 
 on:
   workflow_dispatch:
-  push:
-    branches: [open-animation-launch, animation_launch]
-    paths:
-      - SideStore/Views/SplashView.swift
-      - scripts/animation/**
-      - .github/workflows/animation-launch.yml
 
 permissions:
   contents: read
