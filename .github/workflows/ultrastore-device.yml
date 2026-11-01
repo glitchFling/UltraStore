@@ -40,7 +40,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/logs
-          make build fakesign ipa 2>&1 | tee build/logs/ultrastore-device.log
+          make -B build 2>&1 | tee build/logs/ultrastore-device.log
+          make fakesign ipa 2>&1 | tee -a build/logs/ultrastore-device.log
       - name: Verify app identity and name the artifact
         run: |
           python3 - <<'PY'
