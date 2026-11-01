@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   export:
-    name: Record SwiftUI splash as MP4
+    name: Render SwiftUI splash as MP4
     runs-on: xcode-27
     timeout-minutes: 20
     steps:
@@ -27,7 +27,7 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1.6.0
         with:
           xcode-version: "27.2"
-      - name: Build preview and record video
+      - name: Render preview video
         run: bash scripts/animation/export-launch.sh
       - name: Upload video and recording diagnostics
         if: always()
@@ -36,7 +36,6 @@ jobs:
           name: animation_launch
           path: |
             build/animation_launch/animation_launch.mp4
-            build/animation_launch/final-frame.png
-            build/animation_launch/recording.log
+            build/animation_launch/curved-arrow.png
           if-no-files-found: warn
           retention-days: 14

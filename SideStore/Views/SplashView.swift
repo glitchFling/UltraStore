@@ -34,20 +34,12 @@ struct SplashView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                ZStack {
-                    UltraStoreLogoBowl()
-                        .stroke(.white, style: StrokeStyle(lineWidth: logoSize * 0.11, lineCap: .round))
-                        .opacity(isFlying ? 0 : 1)
-
-                    UltraStoreLaunchArrow(stretch: stretch)
-                        .fill(.white)
-                        .scaleEffect(isFlying ? 3.2 : 1, anchor: .center)
-                        .rotationEffect(.degrees(isFlying ? 42 : 0))
-                        .offset(
-                            x: isFlying ? geometry.size.width : 0,
-                            y: isFlying ? -geometry.size.height : 0
-                        )
-                }
+                UltraStoreLaunchLogo(
+                    logoSize: logoSize,
+                    screenSize: geometry.size,
+                    stretch: stretch,
+                    flight: isFlying ? 1 : 0
+                )
                 .frame(width: logoSize, height: logoSize)
                 .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                 .accessibilityElement(children: .ignore)
@@ -89,6 +81,28 @@ struct SplashView: View {
             } catch {
                 // SwiftUI cancels this task if the splash is removed.
             }
+        }
+    }
+}
+
+// Shared by the splash and the frame-by-frame MP4 exporter.
+struct UltraStoreLaunchLogo: View {
+    var logoSize: CGFloat
+    var screenSize: CGSize
+    var stretch: CGFloat
+    var flight: CGFloat
+
+    var body: some View {
+        ZStack {
+            UltraStoreLogoBowl()
+                .stroke(.white, style: StrokeStyle(lineWidth: logoSize * 0.11, lineCap: .round))
+                .opacity(1 - Double(flight))
+
+            UltraStoreLaunchArrow(stretch: stretch)
+                .fill(.white)
+                .scaleEffect(1 + 2.2 * flight, anchor: .center)
+                .rotationEffect(.degrees(42 * Double(flight)))
+                .offset(x: screenSize.width * flight, y: -screenSize.height * flight)
         }
     }
 }
