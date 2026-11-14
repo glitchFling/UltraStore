@@ -148,6 +148,9 @@ def build():
     )
     run("make fakesign | tee -a build/logs/build.log")
     run("make ipa | tee -a build/logs/build.log")
+    ipa_name = getenv("IPA_NAME", "SideStore.ipa")
+    if ipa_name != "SideStore.ipa":
+        (ROOT / "SideStore.ipa").replace(ROOT / ipa_name)
     run("zip -r -9 ./SideStore.dSYMs.zip ./SideStore.xcarchive/dSYMs")
 
 # ----------------------------------------------------------
@@ -441,9 +444,10 @@ def upload_release(release_name, release_tag, commit_sha, repo, upstream_tag_rec
             f'{draft_flag} {prerelease_flag} {latest_flag}'
         )
 
+    ipa_name = getenv("IPA_NAME", "SideStore.ipa")
     run(
         f'gh release upload "{release_tag}" '
-        f'SideStore.ipa SideStore.dSYMs.zip build-logs.zip '
+        f'"{ipa_name}" SideStore.dSYMs.zip build-logs.zip '
         f'--clobber'
     )
 

@@ -2,6 +2,7 @@
 import datetime
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 import argparse
@@ -81,6 +82,7 @@ def main():
 
     repo_root = Path(args.repo_root).resolve()
     ipa_path = Path(args.ipa).resolve()
+    release_repo = os.environ.get("GITHUB_REPOSITORY", "SideStore/SideStore")
     out_dir = Path(args.output_dir).resolve()
     notes_dir = Path(args.release_notes_dir).resolve()
 
@@ -150,8 +152,8 @@ def main():
         "size": file_size(ipa_path),
         "sha256": sha256(ipa_path),
         "download_url": (
-            "https://github.com/SideStore/SideStore/releases/download/"
-            f"{args.release_tag}/SideStore.ipa"
+            f"https://github.com/{release_repo}/releases/download/"
+            f"{args.release_tag}/{ipa_path.name}"
         ),
         "localized_description": localized_description,
     }

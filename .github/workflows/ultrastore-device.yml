@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   build:
-    name: UltraStore 0.0.2 - iPhone IPA
+    name: UltraStore 0.0.3 - iPhone IPA
     runs-on: xcode-27
     timeout-minutes: 90
     env:
@@ -53,20 +53,20 @@ jobs:
           expected = {
               "CFBundleDisplayName": "UltraStore",
               "CFBundleName": "UltraStore",
-              "CFBundleIdentifier": "com.ultrastore.xp",
-              "CFBundleShortVersionString": "0.0.2",
-              "CFBundleVersion": "2",
+              "CFBundleIdentifier": "com.ultrastore.dev",
+              "CFBundleShortVersionString": "0.0.3",
+              "CFBundleVersion": "3",
           }
           for key, value in expected.items():
               assert info.get(key) == value, f"{key}: expected {value!r}, got {info.get(key)!r}"
-          print("Verified UltraStore / com.ultrastore.xp / 0.0.2 (2)")
-          shutil.copyfile("SideStore.ipa", "build/UltraStore-0.0.2.ipa")
+          print("Verified UltraStore / com.ultrastore.dev / 0.0.3 (3)")
+          shutil.copyfile("SideStore.ipa", "build/UltraStore-0.0.3.ipa")
           PY
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: UltraStore-0.0.2
-          path: build/UltraStore-0.0.2.ipa
+          name: UltraStore-0.0.3
+          path: build/UltraStore-0.0.3.ipa
           if-no-files-found: error
           retention-days: 14
       - name: Upload build log

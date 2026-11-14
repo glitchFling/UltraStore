@@ -51,6 +51,7 @@ struct InstalledAppQuery: EntityQuery
 @available(iOS 17.0, *)
 struct SelectAppIntent: WidgetConfigurationIntent
 {
+    static var isDiscoverable: Bool { false }
     static var title: LocalizedStringResource = "Select App"
     static var description = IntentDescription("Choose which app to display.")
 

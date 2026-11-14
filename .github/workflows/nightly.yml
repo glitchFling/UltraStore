@@ -1,4 +1,4 @@
-name: Nightly SideStore Build
+name: Nightly UltraStore Build
 
 on:
   push:
@@ -25,6 +25,7 @@ jobs:
       DEPLOY_KEY: ${{ secrets.CROSS_REPO_PUSH_KEY }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_NAME: Nightly
+      IPA_NAME: UltraStore.ipa
       CHANNEL: nightly
       UPSTREAM_CHANNEL: ""
 
@@ -72,16 +73,9 @@ jobs:
           MARKETING_VERSION=$(python3 scripts/ci/workflow.py get-marketing-version)
           SHORT_COMMIT=$(python3 scripts/ci/workflow.py commit-id)
 
-          NORMALIZED_VERSION=$(python3 scripts/ci/workflow.py compute-normalized \
-              "$MARKETING_VERSION" \
-              "$BUILD_NUM" \
-              "$SHORT_COMMIT")
-
-          python3 scripts/ci/workflow.py set-marketing-version "$NORMALIZED_VERSION"
-
           echo "BUILD_NUM=$BUILD_NUM" | tee -a $GITHUB_ENV
           echo "SHORT_COMMIT=$SHORT_COMMIT" | tee -a $GITHUB_ENV
-          echo "MARKETING_VERSION=$NORMALIZED_VERSION" | tee -a $GITHUB_ENV
+          echo "MARKETING_VERSION=$MARKETING_VERSION" | tee -a $GITHUB_ENV
 
       - name: Setup Xcode
         if: steps.build_gate.outputs.should_skip != 'true'
@@ -209,8 +203,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: steps.build_gate.outputs.should_skip != 'true'
         with:
-          name: SideStore-${{ env.MARKETING_VERSION }}.ipa
-          path: SideStore.ipa
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_NAME }}
       - uses: actions/upload-artifact@v4
         if: steps.build_gate.outputs.should_skip != 'true'
         with:
@@ -229,9 +223,7 @@ jobs:
         if: steps.build_gate.outputs.should_skip != 'true'
         run: |
           python3 scripts/ci/workflow.py dump-project-settings
-          PRODUCT_NAME=$(python3 scripts/ci/workflow.py read-product-name)
           BUNDLE_ID=$(python3 scripts/ci/workflow.py read-bundle-id)
-          IPA_NAME="$PRODUCT_NAME.ipa"
 
           python3 scripts/ci/workflow.py generate-metadata \
             "$CHANNEL" \

@@ -63,7 +63,12 @@ class UpdateKnownSourcesOperation: OperationLogging
         }
         
         let decoded = try Foundation.JSONDecoder().decode(Response.self, from: data)
-        let sources = (defaultSources: decoded.defaultSources ?? [], blocked: decoded.blocked ?? [])
+        let recommendedSources = (decoded.defaultSources ?? []).filter { source in
+            guard source.identifier != Source.altStoreIdentifier else { return false }
+            guard let url = source.sourceURL else { return true }
+            return (try? Source.sourceID(from: url)) != Source.altStoreIdentifier
+        }
+        let sources = (defaultSources: recommendedSources, blocked: decoded.blocked ?? [])
         
         // Cache sources
         UserDefaults.standard.recommendedSources = sources.defaultSources

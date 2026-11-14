@@ -1,9 +1,6 @@
-name: Stable SideStore build
+name: Stable UltraStore build
 
 on:
-  push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
 concurrency:
@@ -12,11 +9,12 @@ concurrency:
 
 jobs:
   build:
-    name: Build SideStore - stable
+    name: Build UltraStore - stable
     runs-on: xcode-27
 
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      IPA_NAME: UltraStore.ipa
       CHANNEL: stable
       UPSTREAM_CHANNEL: ""
 
@@ -39,7 +37,7 @@ jobs:
           MARKETING_VERSION=$(python3 scripts/ci/workflow.py get-marketing-version)
           SHORT_COMMIT=$(python3 scripts/ci/workflow.py commit-id)
 
-          if [ "$MARKETING_VERSION" != "${{ github.ref_name }}" ]; then
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$MARKETING_VERSION" != "$GITHUB_REF_NAME" ]; then
             echo "Version mismatch"
             echo "Build.xcconfig: $MARKETING_VERSION"
             echo "Tag: ${{ github.ref_name }}"
@@ -100,8 +98,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SideStore-${{ env.MARKETING_VERSION }}.ipa
-          path: SideStore.ipa
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_NAME }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -111,12 +109,10 @@ jobs:
       - name: Generate Metadata
         run: |
           python3 scripts/ci/workflow.py dump-project-settings
-          PRODUCT_NAME=$(python3 scripts/ci/workflow.py read-product-name)
           BUNDLE_ID=$(python3 scripts/ci/workflow.py read-bundle-id)
-          IPA_NAME="$PRODUCT_NAME.ipa"
 
           python3 scripts/ci/workflow.py generate-metadata \
-            "${{ github.ref_name }}" \
+            "$MARKETING_VERSION" \
             "$SHORT_COMMIT" \
             "$MARKETING_VERSION" \
             "$CHANNEL" \
@@ -129,8 +125,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 scripts/ci/workflow.py upload-release \
-            "${{ github.ref_name }}" \
-            "${{ github.ref_name }}" \
+            "$MARKETING_VERSION" \
+            "$MARKETING_VERSION" \
             "$GITHUB_SHA" \
             "$GITHUB_REPOSITORY" \
             "$UPSTREAM_CHANNEL" \

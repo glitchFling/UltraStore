@@ -89,14 +89,14 @@ struct InstallIPAIntent: AppIntent, ProgressReportingIntent
 enum RefreshErrorBehavior: String, AppEnum
 {
     case fail
-    case printOnly
     case skip
+    case printOnly
 
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Fail on Error"
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Fail On Error"
     static var caseDisplayRepresentations: [RefreshErrorBehavior: DisplayRepresentation] = [
-        .fail: "Fail",
-        .printOnly: "print-only",
-        .skip: "skip"
+        .fail: "fail",
+        .skip: "skip",
+        .printOnly: "print-only"
     ]
 }
 
@@ -122,7 +122,7 @@ struct RefreshAllAppsIntent: AppIntent, CustomIntentMigratedAppIntent, Predictab
     static var title: LocalizedStringResource = "Refresh All Apps"
     static var description = IntentDescription("Refreshes your sideloaded apps to prevent them from expiring.")
     
-    @Parameter(title: "Fail on Error", default: .fail)
+    @Parameter(title: "Fail On Error", default: .fail)
     var errorBehavior: RefreshErrorBehavior
 
     static var parameterSummary: some ParameterSummary {
@@ -292,7 +292,7 @@ struct InstalledAppQuery: EntityQuery
         let installedApps = try await Self.fetchRefreshableApps()
         return installedApps
             .filter { identifiers.contains($0.bundleIdentifier) }
-            .map { InstalledAppEntity(id: $0.bundleIdentifier, name: $0.name) }
+            .map { InstalledAppEntity(id: $0.bundleIdentifier, name: $0.bundleIdentifier == StoreApp.altstoreAppID ? "UltraStore" : $0.name) }
     }
     
     func suggestedEntities() async throws -> [InstalledAppEntity]
@@ -300,7 +300,7 @@ struct InstalledAppQuery: EntityQuery
         let installedApps = try await Self.fetchRefreshableApps()
         debugLog("[InstalledAppQuery] Suggested entities requested (\(installedApps.count) app(s) returned)")
         return installedApps
-            .map { InstalledAppEntity(id: $0.bundleIdentifier, name: $0.name) }
+            .map { InstalledAppEntity(id: $0.bundleIdentifier, name: $0.bundleIdentifier == StoreApp.altstoreAppID ? "UltraStore" : $0.name) }
             .sorted { $0.name < $1.name }
     }
     
@@ -330,12 +330,12 @@ extension RefreshAppIntent
 struct RefreshAppIntent: AppIntent, PredictableIntent, ProgressReportingIntent, ForegroundContinuableIntent
 {
     static var title: LocalizedStringResource = "Refresh App"
-    static var description = IntentDescription("Refreshes the selected sideloaded app to prevent it from expiring.")
+    static var description = IntentDescription("Refreshes UltraStore or another selected sideloaded app to prevent it from expiring.")
     
     @Parameter(title: "App")
     var app: InstalledAppEntity?
     
-    @Parameter(title: "Fail on Error", default: .fail)
+    @Parameter(title: "Fail On Error", default: .fail)
     var errorBehavior: RefreshErrorBehavior
 
     static var parameterSummary: some ParameterSummary {
@@ -394,7 +394,7 @@ struct RefreshAppIntent: AppIntent, PredictableIntent, ProgressReportingIntent, 
                 }
             }
             
-            return .result(dialog: "Refreshed \(self.app?.name ?? "app").")
+            return .result(dialog: "Refreshed \(self.app?.name ?? "UltraStore").")
         }
         catch
         {
@@ -417,19 +417,18 @@ private extension RefreshAppIntent
 {
     func refreshApp() async throws
     {
-        guard let app = self.app else {
-            throw OperationError.invalidParameters("No app selected.")
-        }
-        
+        let bundleIdentifier = self.app?.id ?? StoreApp.altstoreAppID
         try await DatabaseManager.shared.start()
-        
+
         let context = DatabaseManager.shared.persistentContainer.newBackgroundContext()
-        let installedApps = await context.perform { InstalledApp.fetchAppsForRefreshingAll(in: context) }
-        
-        guard let installedApp = installedApps.first(where: { $0.bundleIdentifier == app.id }) else {
+        let installedApp = await context.perform {
+            InstalledApp.fetchAppsForRefreshingAll(in: context).first { $0.bundleIdentifier == bundleIdentifier }
+        }
+
+        guard let installedApp else {
             throw OperationError.invalidParameters("The selected app is not installed or cannot be refreshed.")
         }
-        
+
         try await withCheckedThrowingContinuation { continuation in
             do
             {
